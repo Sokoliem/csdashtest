@@ -1,22 +1,50 @@
 <script>
-  import { onMount } from 'svelte';
-  import { createClient, SupabaseClient } from '@supabase/supabase-js';
+    import { writable } from 'svelte/store';
+    import { onMount } from 'svelte';
+    import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-  const supabaseUrl = 'https://your-supabase-url.supabase.co';
-  const supabaseKey = 'your-supabase-key';
-  const supabase: SupabaseClient = createClient(supabaseUrl, supabaseKey);
+    const supabaseUrl = 'https://your-supabase-url.supabase.co';
+    const supabaseKey = 'your-supabase-key';
+    const supabase: SupabaseClient = createClient(supabaseUrl, supabaseKey);
 
-  let email = '';
-  let password = '';
+    let user = writable(null);
+    let error = writable(null);
 
-  async function login() {
-    const { user, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    console.log('Logged in:', user);
-  }
-</script>
+    async function login(email, password) {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        error.set(error.message);
+      } else {
+        user.set(data.user);
+      }
+    }
 
-<h2>Login</h2>
-<input type="email" bind:value={email} placeholder="Email" />
-<input type="password" bind:value={password} placeholder="Password" />
-<button on:click={login}>Login</button>
+    onMount(() => {
+      const authListener = supabase.auth.onAuthStateChange((event, session) => {
+        if (session?.user) {
+          user.set(session.user);
+        } else {
+          user.set(null);
+        }
+      });
+
+      return () => {
+        authListener.data.unsubscribe();
+      };
+    });
+  </script>
+
+  <h1>Login</h1>
+  {#if $user}
+    <p>Welcome, {$user.email}!</p>
+  {:else}
+    <form on:submit|preventDefault={async (event) => {
+      const email = event.target.elements.email.value;
+      const password = event.target.elements.password.value;
+      await login(email, password);
+    }}>
+      <input type="email" name="email" placeholder="Email" required />
+      <input type="password" name="password" placeholder="Password" required />
+      <button type="submit">Login</button>
+    </form>
+  {/if}

@@ -1,20 +1,38 @@
 <script>
-  import { tasks } from '../store.js';
+    import { onMount } from 'svelte';
+    import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-  let newTask = '';
+    const supabaseUrl = 'https://your-supabase-url.supabase.co';
+    const supabaseKey = 'your-supabase-key';
+    const supabase: SupabaseClient = createClient(supabaseUrl, supabaseKey);
 
-  async function addTask() {
-    const { error } = await supabase.from('tasks').insert([{ title: newTask, due_date: new Date().toISOString() }]);
-    if (error) throw error;
-    newTask = '';
-  }
-</script>
+    let tasks = [];
+    let users = [];
 
-<h2>Tasks</h2>
-<input type="text" bind:value={newTask} placeholder="New Task" />
-<button on:click={addTask}>Add Task</button>
-<ul>
-  {#each $tasks as task}
-    <li>{task.title} - Due: {task.due_date}</li>
-  {/each}
-</ul>
+    onMount(async () => {
+      const { data: taskData, error } = await supabase.from('tasks').select('*');
+      if (error) throw error;
+      tasks = taskData;
+
+      const { data: userData, error: userError } = await supabase.from('users').select('*');
+      if (userError) throw error;
+      users = userData;
+    });
+
+    async function assignTask(taskId, userId) {
+      const { error } = await supabase
+        .from('task_assignments')
+        .insert([{ task_id: taskId, user_id: userId }]);
+      if (error) throw error;
+    }
+  </script>
+
+  <h1>Task List</h1>
+  <ul>
+    {#each tasks as task}
+      <li>
+        {task.title} - Due: {task.due_date}
+        <button on:click={() => assignTask(task.id, users[0].id)}>Assign to User 1</button>
+      </li>
+    {/each}
+  </ul>
